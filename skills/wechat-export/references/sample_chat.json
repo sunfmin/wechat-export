@@ -1,0 +1,107 @@
+{
+ "conversation": "小明",
+ "kind": "single",
+ "remark": "小明",
+ "nick": "小明",
+ "alias": "xiaoming_demo",
+ "wxid": "wxid_demo0001",
+ "count": 12,
+ "messages": [
+  {
+   "time": "2024-05-18 09:02:10",
+   "ts": 0,
+   "speaker": "小明",
+   "type": 1,
+   "text": "在吗？",
+   "is_self": false
+  },
+  {
+   "time": "2024-05-18 09:05:41",
+   "ts": 0,
+   "speaker": "我",
+   "type": 1,
+   "text": "在的，刚到公司 [OK]",
+   "is_self": true
+  },
+  {
+   "time": "2024-05-18 09:06:12",
+   "ts": 0,
+   "speaker": "小明",
+   "type": 1,
+   "text": "周末一起爬山吗 [拥抱]",
+   "is_self": false
+  },
+  {
+   "time": "2024-05-18 09:07:03",
+   "ts": 0,
+   "speaker": "我",
+   "type": 1,
+   "text": "好啊，叫上大家 [呲牙]",
+   "is_self": true
+  },
+  {
+   "time": "2024-05-18 09:10:22",
+   "ts": 0,
+   "speaker": "小明",
+   "type": 1,
+   "text": "[图片]",
+   "is_self": false
+  },
+  {
+   "time": "2024-05-18 09:11:00",
+   "ts": 0,
+   "speaker": "我",
+   "type": 1,
+   "text": "这照片拍得不错",
+   "is_self": true
+  },
+  {
+   "time": "2024-05-19 18:30:05",
+   "ts": 0,
+   "speaker": "小明",
+   "type": 1,
+   "text": "几点集合",
+   "is_self": false
+  },
+  {
+   "time": "2024-05-19 18:31:20",
+   "ts": 0,
+   "speaker": "我",
+   "type": 1,
+   "text": "八点老地方  〔回复 小明：几点集合〕",
+   "is_self": true
+  },
+  {
+   "time": "2024-05-19 18:32:01",
+   "ts": 0,
+   "speaker": "小明",
+   "type": 1,
+   "text": "收到",
+   "is_self": false
+  },
+  {
+   "time": "2024-05-19 18:40:11",
+   "ts": 0,
+   "speaker": "我",
+   "type": 1,
+   "text": "[通话]",
+   "is_self": true
+  },
+  {
+   "time": "2024-05-19 20:15:33",
+   "ts": 0,
+   "speaker": "小明",
+   "type": 1,
+   "text": "路上小心 [爱心]",
+   "is_self": false
+  },
+  {
+   "time": "2024-05-19 20:16:00",
+   "ts": 0,
+   "speaker": "我",
+   "type": 1,
+   "text": "你也是",
+   "is_self": true
+  }
+ ]
+}
