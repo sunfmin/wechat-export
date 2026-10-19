@@ -24,18 +24,29 @@ against an account or a machine that is not the user's.
 
 ## What it takes
 - macOS, Apple Silicon, **WeChat for Mac 4.x logged in** on this machine.
+- The **direct-download build** from https://mac.weixin.qq.com — **not** the Mac App Store
+  build. Key extraction needs an ad-hoc re-sign to let Frida attach; the App Store build
+  (ships a `_MASReceipt`, team-bound sandbox entitlements, no `cs.allow`) is rejected by AMFI
+  after re-sign (`Launchd job spawn failed, error=163`) — a hard dead end. `preflight.sh`
+  detects this and blocks. The direct-download build carries `com.apple.security.cs.allow-*`
+  and re-signs + launches fine.
 - **root** (sudo) — Frida needs `task_for_pid`; re-signing WeChat.
 - `uv`, `git`, Xcode CLT (`codesign`). The pipeline installs `frida<17`, `pycryptodome`,
   `zstandard` into its own venv. Chrome only if the user also wants a PDF.
 - Two tools cloned on demand: `3351666087/wechat-key-macos` (Frida key hook) and
   `Z-V-I/wechat4-db-export` (decrypt + export).
 
-## Two unavoidable manual moments
-The rest is automated, but these two need a human — tell the user up front:
+## Two unavoidable manual moments (first capture only)
+The rest is automated, but the **first** key capture needs a human — tell the user up front:
 1. **sudo password** when Frida starts as root.
 2. **Trigger decryption** — the user opens the target chat in WeChat and taps 收藏/搜索 and
    scrolls, so page reads fire `CCCrypt` and the key is captured. Nothing to capture if WeChat
    just sits idle.
+
+**Both are skipped once you have the key.** The DB key is tied to the account + the existing
+database files, not to the WeChat binary, so a key captured once stays valid until WeChat
+re-initialises its databases (i.e. the user logs out and back in). Supply a saved key and the
+export needs no sudo, no re-sign, no Frida and no trigger — it just decrypts (see step 2).
 
 ## Do this
 
@@ -54,6 +65,23 @@ It backs up `db_storage`, clones the tools, re-signs WeChat with `get-task-allow
 key via Frida (← manual moments 1 & 2 happen here), decrypts with wxbak (incl. WAL), exports the
 one conversation to JSON, renders the HTML to `~/Desktop/微信聊天记录-<person>-<span>.html`, and
 restores WeChat's signature. Env knobs: `WORK=<dir>`, `OUT=<file.html>`, `WKM_WAIT=<seconds>`.
+
+**Reuse a saved key (skip re-sign + Frida).** If you captured the key on a past run, supply it
+and phases 3–4 (re-sign + Frida + both manual moments) are skipped — fully automatic, read-only,
+WeChat untouched. Either drop the key at `$WORK/keys.json`, or pass it compact via env:
+```bash
+WECHAT_KEYS_JSON='{"message/message_0.db":{"enc_key":"…","salt":"…"},…}' scripts/export_wechat.sh "<who>"
+```
+Feed it from wherever you keep secrets, e.g. `WECHAT_KEYS_JSON="$(your-secret-tool get …)"`. The
+key stays valid until WeChat re-initialises its DBs (logout→login); keep the `db-backup/` and that
+key together for a permanently re-decryptable snapshot.
+
+On a **headless / no-tty host** plain `sudo` can't prompt — use sudo's askpass:
+```bash
+SUDO_ASKPASS="$HOME/.local/bin/askpass" SUDO="sudo -A" scripts/export_wechat.sh "<who>"
+```
+(A GUI password dialog pops for approval. Also works for a **group chat** — pass the group's
+name as `<who>`; each sender shows on the left with their name, me on the right.)
 
 **If the person name doesn't resolve**, list conversations and pick the exact 备注/昵称/微信号:
 ```bash
@@ -89,8 +117,12 @@ innerWidth` at phone width (no horizontal scroll).
   the thumbnail `.dat` is AES-encrypted (format "V2", header `07 08 56 32`) and the image key
   is a separate capture, not yet implemented. Text, transfers, quotes, system notices are
   complete.
-- Verified on **4.1.13**. Other 4.x builds may shift offsets/iterations — if keys don't verify,
-  re-check the params in `references/internals.md` rather than guessing.
+- Verified on **4.1.13** and **4.1.15** (direct-download). Other 4.x builds may shift
+  offsets/iterations — if keys don't verify, re-check the params in `references/internals.md`
+  rather than guessing.
+- **Group chats** work: each sender is shown on the left under their display name, you on the
+  right; the internal `<sender>:\n` tag WeChat prefixes to every group message is stripped, and
+  system notices (recalls, group management) render as centered grey lines.
 
 ## Deeper notes
 `references/internals.md` — SQLCipher-4 params, the CCCrypt-hook rationale and anti-debug
