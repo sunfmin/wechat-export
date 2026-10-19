@@ -26,6 +26,18 @@ if [ -d "$APP" ]; then
   VER=$(/usr/bin/defaults read "$APP/Contents/Info" CFBundleShortVersionString 2>/dev/null)
   pass "WeChat.app present (v$VER)"
   case "$VER" in 4.*) pass "WeChat 4.x (SQLCipher-4 scheme)";; *) note "version $VER — pipeline verified on 4.x";; esac
+  # Build provenance decides whether key extraction is even possible. Frida needs an ad-hoc
+  # re-sign to attach; the App Store build (ships a _MASReceipt, team-bound sandbox
+  # entitlements, no cs.allow) is REJECTED by AMFI after re-sign (Launchd spawn error 163)
+  # — a hard dead end. The weixin.qq.com direct-download build carries
+  # com.apple.security.cs.allow-* and re-signs + launches fine.
+  if [ -e "$APP/Contents/_MASReceipt/receipt" ]; then
+    bad "App Store 版 WeChat（含 _MASReceipt）：重签后会被 AMFI 拒绝启动（spawn error 163），无法抓钥。请改装官网直装版：https://mac.weixin.qq.com"
+  elif codesign -d --entitlements :- "$APP" 2>/dev/null | grep -q "com.apple.security.cs.allow"; then
+    pass "direct-download build（带 cs.allow entitlements，可重签+启动）"
+  else
+    note "未见 cs.allow entitlements——若重签后微信起不来，多半是 App Store 版，请换官网直装版 https://mac.weixin.qq.com"
+  fi
 else
   bad "WeChat.app not found in /Applications"
 fi

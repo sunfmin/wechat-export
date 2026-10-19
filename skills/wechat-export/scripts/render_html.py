@@ -40,6 +40,11 @@ EMOJI = {
 _EMO_RE = re.compile(r"\[([^\[\]]{1,8})\]")
 # 引用：  正文  〔回复 名字：被引用原文〕
 _QUOTE_RE = re.compile(r"^(.*?)\s*〔回复\s*(.+?)：(.*)〕\s*$", re.S)
+# 群聊里每条消息正文前都带 "<发送者wxid或chatroom>:\n" 前缀（1 对 1 没有）。
+# 发送者已单独解析进 speaker，这里把冗余前缀去掉。仅群聊启用，避免误伤 "OK:\n…" 之类正文。
+_SENDER_TAG_RE = re.compile(r"^[0-9A-Za-z_\-.][0-9A-Za-z_\-.@]*:\n")
+# 自定义表情贴纸带哈希：[表情#798168f5] → [表情]
+_STICKER_RE = re.compile(r"^\[表情#[0-9a-fA-F]+\]$")
 
 
 def _emojify(escaped):
@@ -68,6 +73,8 @@ STYLE = """
           padding-left:max(16px, env(safe-area-inset-left));
           padding-right:max(16px, env(safe-area-inset-right)); }
   .day { text-align:center; margin:14px 0 8px; font-size:12px; color:#999; }
+  .sys { text-align:center; margin:9px auto; max-width:80%; font-size:13px;
+         color:#999; word-break:break-word; }
   .row { display:flex; margin:7px 0; }
   .row.you { justify-content:flex-start; }
   .row.me { justify-content:flex-end; }
@@ -102,6 +109,7 @@ def render(d):
         if meta.get(k):
             sub.append({"nick": "昵称", "alias": "微信号", "wxid": "wxid"}[k] + "：" + str(meta[k]))
     span = f'{msgs[0]["time"]} ~ {msgs[-1]["time"]}' if msgs else ""
+    is_group = meta.get("kind") == "群聊" or str(meta.get("wxid", "")).endswith("@chatroom")
 
     rows = []
     cur_date = None
@@ -111,13 +119,28 @@ def render(d):
         if date != cur_date:
             cur_date = date
             rows.append(f'<div class="day">{esc(date)}</div>')
+        raw = m.get("text", "") or ""
+        if is_group:  # drop the leading "<sender>:\n" tag group messages carry
+            raw = _SENDER_TAG_RE.sub("", raw, count=1)
+        # 系统/通知消息（入群、撤回、群管理…）：居中灰字，不画气泡；残留 XML 收敛为占位
+        if m.get("type") == 10000:
+            body = raw.strip()
+            if re.fullmatch(r"[0-9A-Za-z_\-.@]+:", body):  # bare "<id>:" leftover, no content
+                body = ""
+            if not body or body.startswith("<"):
+                body = "[系统消息]"
+            rows.append(f'<div class="sys">{esc(body)}</div>')
+            continue
+        if _STICKER_RE.match(raw):
+            raw = "[表情]"
         side = "me" if m.get("is_self") else "you"
         speaker = esc(m.get("speaker", ""))
-        raw = m.get("text", "") or ""
         quote_html = ""
         q = _QUOTE_RE.match(raw)
         if q and "〔回复" not in q.group(1):
             reply, qname, qorig = q.group(1), q.group(2), q.group(3)
+            if is_group:  # quoted group original also carries the inner "<sender>:\n" tag
+                qorig = _SENDER_TAG_RE.sub("", qorig, count=1).strip()
             body = esc(reply)
             quote_html = f'<div class="quote">{esc(qname)}：{esc(qorig)}</div>'
         else:
