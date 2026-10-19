@@ -27,8 +27,13 @@ Apple Silicon. Numbers may shift across 4.x point releases — re-verify, don't 
   so an **attach** (not launch) captures keys as you browse. Tool: `wechat-key-macos`
   (`scripts/extract_key.py`). It verifies each candidate against page-1 HMAC before writing.
 - `CCKeyDerivationPBKDF` only fires at DB-open (startup) — less reliable; CCCrypt is the win.
-- **Prereqs:** root (Frida needs `task_for_pid`, not ptrace), WeChat re-signed ad-hoc with
-  `get-task-allow`, and **frida < 17** (17+ broke this flow here).
+- **Prereqs:** root (Frida needs `task_for_pid`, not ptrace), a WeChat **copy** re-signed
+  ad-hoc with `get-task-allow` (preserve the original entitlements — signing with get-task-allow
+  alone strips the sandbox/keychain entitlements and the 4.x build won't launch), and
+  **frida < 17** (17+ broke this flow here). Run the COPY, not the installed app: launched via
+  `open -n "$WORK/WeChat-crack.app"`, it runs its own binary (verified via `lsof` txt path) and
+  shares the account container by bundle id, so `/Applications/WeChat.app` keeps its genuine
+  signature and is never touched. The copy is a near-free APFS clone (`cp -a`).
 - **Anti-debug:** WeChat detects `P_TRACED` and relaunches a clean copy via LaunchServices, so
   `lldb`-as-launch dies in ~2s; as root the relaunch fails but lands in the wrong `/var/root`
   container. CCCrypt-via-attach sidesteps all of it.
@@ -88,7 +93,15 @@ Apple Silicon. Numbers may shift across 4.x point releases — re-verify, don't 
 
 ## Safety / cleanup
 - Operate read-only: copy DBs out, never write into the live `db_storage`. Back it up first.
-- When done, **restore WeChat's signature** — `codesign -f -s - --deep /Applications/WeChat.app`
-  removes the `get-task-allow` entitlement (with it set, WeChat's own anti-debug may refuse to
-  launch). The cleanest restore is to **reinstall WeChat** (genuine Tencent signature back);
-  chat data is untouched by any of this.
+- **Nothing to restore on the installed app** — the get-task-allow re-sign is applied to a
+  COPY (`$WORK/WeChat-crack.app`), not `/Applications/WeChat.app`, so the installed WeChat
+  keeps its genuine Tencent signature and stays launchable the whole time. Delete the copy
+  with the rest of `$WORK` when done. (Historical note: an earlier version re-signed the
+  installed app in place and then tried to re-sign it back; re-signing back **without**
+  `--entitlements` strips sandbox/keychain/cs.allow and the app silently won't launch — which
+  is exactly why the copy approach replaced it. If you ever find an installed app left in that
+  state, re-sign it with its original entitlements minus get-task-allow, or reinstall.)
+- **Reuse the key, skip the copy entirely.** The captured per-DB keys stay valid until WeChat
+  re-initialises its databases (logout→login), so a saved `keys.json` (or `WECHAT_KEYS_JSON`)
+  lets the pipeline decrypt with no sudo, no copy, no Frida, no trigger. Pair the key with the
+  `db-backup/` for a permanently re-decryptable snapshot.
